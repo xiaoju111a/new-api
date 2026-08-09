@@ -66,6 +66,7 @@ var codexCliPassThroughHeaders = []string{
 }
 
 var claudeCliPassThroughHeaders = []string{
+	"X-Agent-Session-Id",
 	"X-Stainless-Arch",
 	"X-Stainless-Lang",
 	"X-Stainless-Os",
@@ -136,6 +137,7 @@ var channelAffinitySetting = ChannelAffinitySetting{
 			ModelRegex: []string{"^claude-.*$"},
 			PathRegex:  []string{"/v1/messages"},
 			KeySources: []ChannelAffinityKeySource{
+				{Type: "request_header", Key: "X-Agent-Session-Id"},
 				{Type: "gjson", Path: "metadata.user_id"},
 			},
 			ValueRegex:            "",

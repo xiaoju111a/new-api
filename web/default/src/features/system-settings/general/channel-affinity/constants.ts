@@ -44,6 +44,7 @@ const CODEX_CLI_HEADER_PASSTHROUGH_HEADERS = [
 ]
 
 const CLAUDE_CLI_HEADER_PASSTHROUGH_HEADERS = [
+  'X-Agent-Session-Id',
   'X-Stainless-Arch',
   'X-Stainless-Lang',
   'X-Stainless-Os',
@@ -103,7 +104,10 @@ export const RULE_TEMPLATES: Record<string, RuleTemplate> = {
     name: 'claude cli trace',
     model_regex: ['^claude-.*$'],
     path_regex: ['/v1/messages'],
-    key_sources: [{ type: 'gjson', path: 'metadata.user_id' }],
+    key_sources: [
+      { type: 'request_header', key: 'X-Agent-Session-Id' },
+      { type: 'gjson', path: 'metadata.user_id' },
+    ],
     param_override_template: buildPassHeadersTemplate(
       CLAUDE_CLI_HEADER_PASSTHROUGH_HEADERS
     ),

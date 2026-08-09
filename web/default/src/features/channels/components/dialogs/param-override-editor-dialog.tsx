@@ -317,6 +317,7 @@ const CODEX_CLI_HEADER_PASSTHROUGH_HEADERS = [
 ]
 
 const CLAUDE_CLI_HEADER_PASSTHROUGH_HEADERS = [
+  'X-Agent-Session-Id',
   'X-Stainless-Arch',
   'X-Stainless-Lang',
   'X-Stainless-Os',

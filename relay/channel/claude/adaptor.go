@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/relay/channel"
@@ -19,6 +20,8 @@ import (
 
 type Adaptor struct {
 }
+
+const claudeOAuthBeta = "oauth-2025-04-20"
 
 func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
 	//TODO implement me
@@ -80,15 +83,44 @@ func CommonClaudeHeadersOperation(c *gin.Context, req *http.Header, info *relayc
 	model_setting.GetClaudeSettings().WriteHeaders(info.OriginModelName, req)
 }
 
+func isClaudeOAuthToken(apiKey string) bool {
+	return strings.HasPrefix(strings.TrimSpace(apiKey), "sk-ant-oat")
+}
+
+func appendAnthropicBeta(req *http.Header, beta string) {
+	for _, value := range strings.Split(req.Get("anthropic-beta"), ",") {
+		if strings.TrimSpace(value) == beta {
+			return
+		}
+	}
+
+	current := strings.TrimSpace(req.Get("anthropic-beta"))
+	if current == "" {
+		req.Set("anthropic-beta", beta)
+		return
+	}
+	req.Set("anthropic-beta", current+","+beta)
+}
+
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, req)
-	req.Set("x-api-key", info.ApiKey)
+	apiKey := strings.TrimSpace(info.ApiKey)
+	if isClaudeOAuthToken(apiKey) {
+		req.Del("x-api-key")
+		req.Set("Authorization", "Bearer "+apiKey)
+	} else {
+		req.Del("Authorization")
+		req.Set("x-api-key", apiKey)
+	}
 	anthropicVersion := c.Request.Header.Get("anthropic-version")
 	if anthropicVersion == "" {
 		anthropicVersion = "2023-06-01"
 	}
 	req.Set("anthropic-version", anthropicVersion)
 	CommonClaudeHeadersOperation(c, req, info)
+	if isClaudeOAuthToken(apiKey) {
+		appendAnthropicBeta(req, claudeOAuthBeta)
+	}
 	return nil
 }
 

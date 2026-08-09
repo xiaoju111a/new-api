@@ -332,3 +332,51 @@ func TestChannelAffinityHitCodexTemplatePassHeadersEffective(t *testing.T) {
 	_, exists = info.RuntimeHeadersOverride["x-codex-turn-metadata"]
 	require.False(t, exists)
 }
+
+func TestChannelAffinityClaudeSessionHeaderPinsAndPassesChannel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	setting := operation_setting.GetChannelAffinitySetting()
+	require.NotNil(t, setting)
+
+	var claudeRule *operation_setting.ChannelAffinityRule
+	for i := range setting.Rules {
+		rule := &setting.Rules[i]
+		if strings.EqualFold(strings.TrimSpace(rule.Name), "claude cli trace") {
+			claudeRule = rule
+			break
+		}
+	}
+	require.NotNil(t, claudeRule)
+	require.NotEmpty(t, claudeRule.KeySources)
+	require.Equal(t, "request_header", claudeRule.KeySources[0].Type)
+	require.Equal(t, "X-Agent-Session-Id", claudeRule.KeySources[0].Key)
+
+	affinityValue := fmt.Sprintf("agent-session-%d", time.Now().UnixNano())
+	cacheKeySuffix := buildChannelAffinityCacheKeySuffix(*claudeRule, "claude-opus-5", "claude-team", affinityValue)
+	cache := getChannelAffinityCache()
+	require.NoError(t, cache.SetWithTTL(cacheKeySuffix, 9530, time.Minute))
+	t.Cleanup(func() {
+		_, _ = cache.DeleteMany([]string{cacheKeySuffix})
+	})
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"metadata":{"user_id":"fallback-user"}}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Request.Header.Set("X-Agent-Session-Id", affinityValue)
+
+	channelID, found := GetPreferredChannelByAffinity(ctx, "claude-opus-5", "claude-team")
+	require.True(t, found)
+	require.Equal(t, 9530, channelID)
+
+	mergedOverride, applied := ApplyChannelAffinityOverrideTemplate(ctx, nil)
+	require.True(t, applied)
+	info := &relaycommon.RelayInfo{
+		RequestHeaders: map[string]string{"X-Agent-Session-Id": affinityValue},
+		ChannelMeta: &relaycommon.ChannelMeta{ParamOverride: mergedOverride},
+	}
+	_, err := relaycommon.ApplyParamOverrideWithRelayInfo([]byte(`{"model":"claude-opus-5"}`), info)
+	require.NoError(t, err)
+	require.Equal(t, affinityValue, info.RuntimeHeadersOverride["x-agent-session-id"])
+}

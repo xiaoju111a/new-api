@@ -63,6 +63,7 @@ export const CODEX_CLI_HEADER_PASSTHROUGH_HEADERS = [
 ];
 
 export const CLAUDE_CLI_HEADER_PASSTHROUGH_HEADERS = [
+  'X-Agent-Session-Id',
   'X-Stainless-Arch',
   'X-Stainless-Lang',
   'X-Stainless-Os',
@@ -102,7 +103,10 @@ export const CHANNEL_AFFINITY_RULE_TEMPLATES = {
     name: 'claude cli trace',
     model_regex: ['^claude-.*$'],
     path_regex: ['/v1/messages'],
-    key_sources: [{ type: 'gjson', path: 'metadata.user_id' }],
+    key_sources: [
+      { type: 'request_header', key: 'X-Agent-Session-Id' },
+      { type: 'gjson', path: 'metadata.user_id' },
+    ],
     param_override_template: CLAUDE_CLI_HEADER_PASSTHROUGH_TEMPLATE,
     value_regex: '',
     ttl_seconds: 0,
