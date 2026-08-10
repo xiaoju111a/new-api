@@ -9,6 +9,7 @@
 2. proxy
     - 用于配置网络代理
     - 类型为字符串，填写代理地址（例如 socks5 协议的代理地址）
+    - 当 Anthropic Claude 渠道的 Base URL 指向 `claude-agent-gateway` 时，代理地址还会通过专用请求头交给网关作为 Agent Sandbox 的出口代理；该模式仅支持 HTTP/HTTPS 代理
 
 3. thinking_to_content
    - 用于标识是否将思考内容`reasoning_content`转换为`<think>`标签拼接到内容中返回

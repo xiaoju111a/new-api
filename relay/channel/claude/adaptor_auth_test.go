@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/QuantumNous/new-api/dto"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -52,4 +53,40 @@ func TestSetupRequestHeaderKeepsAPIKeyAuthentication(t *testing.T) {
 	assert.Equal(t, "sk-ant-api03-test", header.Get("x-api-key"))
 	assert.Empty(t, header.Get("Authorization"))
 	assert.NotContains(t, strings.Split(header.Get("anthropic-beta"), ","), claudeOAuthBeta)
+}
+
+func TestSetupRequestHeaderForwardsChannelProxyToClaudeAgentGateway(t *testing.T) {
+	c := newClaudeAuthTestContext()
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ApiKey:          "sk-ant-oat01-test",
+			OriginModelName: "claude-opus-5",
+			ChannelBaseUrl:  "https://claude-agent-gateway.example.workers.dev",
+			ChannelSetting: dto.ChannelSettings{
+				Proxy: "http://proxy-user:proxy-pass@proxy.example:8080",
+			},
+		},
+	}
+	header := http.Header{}
+
+	require.NoError(t, (&Adaptor{}).SetupRequestHeader(c, &header, info))
+	assert.Equal(t, info.ChannelSetting.Proxy, header.Get(claudeAgentProxyURLHeader))
+}
+
+func TestSetupRequestHeaderDoesNotLeakChannelProxyToAnthropic(t *testing.T) {
+	c := newClaudeAuthTestContext()
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ApiKey:          "sk-ant-api03-test",
+			OriginModelName: "claude-opus-4-7",
+			ChannelBaseUrl:  "https://api.anthropic.com",
+			ChannelSetting: dto.ChannelSettings{
+				Proxy: "http://proxy-user:proxy-pass@proxy.example:8080",
+			},
+		},
+	}
+	header := http.Header{}
+
+	require.NoError(t, (&Adaptor{}).SetupRequestHeader(c, &header, info))
+	assert.Empty(t, header.Get(claudeAgentProxyURLHeader))
 }

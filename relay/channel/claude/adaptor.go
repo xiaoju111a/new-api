@@ -21,7 +21,10 @@ import (
 type Adaptor struct {
 }
 
-const claudeOAuthBeta = "oauth-2025-04-20"
+const (
+	claudeOAuthBeta           = "oauth-2025-04-20"
+	claudeAgentProxyURLHeader = "x-claude-agent-proxy-url"
+)
 
 func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
 	//TODO implement me
@@ -87,6 +90,15 @@ func isClaudeOAuthToken(apiKey string) bool {
 	return strings.HasPrefix(strings.TrimSpace(apiKey), "sk-ant-oat")
 }
 
+func isClaudeAgentGateway(baseURL string) bool {
+	parsedURL, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return false
+	}
+	hostname := strings.ToLower(parsedURL.Hostname())
+	return strings.Contains(hostname, "claude-agent-gateway")
+}
+
 func appendAnthropicBeta(req *http.Header, beta string) {
 	for _, value := range strings.Split(req.Get("anthropic-beta"), ",") {
 		if strings.TrimSpace(value) == beta {
@@ -118,6 +130,9 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *rel
 	}
 	req.Set("anthropic-version", anthropicVersion)
 	CommonClaudeHeadersOperation(c, req, info)
+	if proxyURL := strings.TrimSpace(info.ChannelSetting.Proxy); proxyURL != "" && isClaudeAgentGateway(info.ChannelBaseUrl) {
+		req.Set(claudeAgentProxyURLHeader, proxyURL)
+	}
 	if isClaudeOAuthToken(apiKey) {
 		appendAnthropicBeta(req, claudeOAuthBeta)
 	}
